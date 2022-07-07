@@ -88,3 +88,78 @@ socket.on("productos", (productos) => {
 	renderTable(productos);
 });
 
+const chatForm = document.querySelector(".chat-form");
+const compressionTitle = document.querySelector(".compression");
+const chatMessageInput = chatForm.querySelector('[name="message"]');
+const chatEmailInput = chatForm.querySelector('[name="email"]');
+const chatNombreInput = chatForm.querySelector('[name="nombre"]');
+const chatApellidoInput = chatForm.querySelector('[name="apellido"]');
+const chatEdadInput = chatForm.querySelector('[name="edad"]');
+const chatAliasInput = chatForm.querySelector('[name="alias"]');
+const chatAvatarInput = chatForm.querySelector('[name="avatar"]');
+const messagesView = document.querySelector(".chat-messages");
+
+const author = new normalizr.schema.Entity(
+	"author",
+	{},
+	{ idAttribute: "email" }
+);
+const text = new normalizr.schema.Entity(
+	"text",
+	{ author: author },
+	{ idAttribute: "id" }
+);
+const chatMessages = new normalizr.schema.Entity(
+	"chatMessages",
+	{
+		authors: [author],
+		messages: [text],
+	},
+	{ idAttribute: "id" }
+);
+
+function renderMessages(messages = null) {
+	const normalizedLength = JSON.stringify(messages).length;
+	const data = normalizr.denormalize(
+		messages.result,
+		chatMessages,
+		messages.entities
+	);
+	const denormalizedLength = JSON.stringify(data).length;
+	const messagesToDisplay = data.messages;
+	const html = messagesTemplate({
+		messages: messagesToDisplay,
+		messagesExists: !!messagesToDisplay.length,
+	});
+	messagesView.innerHTML = html;
+	messagesView.scrollTop = messagesView.scrollHeight;
+	compressionTitle.innerHTML = `(Compresión: ${Math.floor(
+		(100 * normalizedLength) / denormalizedLength
+	)}%)`;
+}
+
+function renderMessage(message) {
+	const html = messageTemplate({ ...message });
+	messagesView.insertAdjacentHTML("beforeend", html);
+	messagesView.scrollTop = messagesView.scrollHeight;
+}
+
+socket.on("messages", renderMessages);
+socket.on("message", renderMessage);
+
+chatForm.addEventListener("submit", (event) => {
+	event.preventDefault();
+	const message = {
+		author: {
+			email: chatEmailInput.value,
+			nombre: chatNombreInput.value,
+			apellido: chatApellidoInput.value,
+			edad: chatEdadInput.value,
+			alias: chatAliasInput.value,
+			avatar: chatAvatarInput.value,
+		},
+		text: chatMessageInput.value,
+	};
+	socket.emit("message", message);
+	chatMessageInput.value = "";
+});
